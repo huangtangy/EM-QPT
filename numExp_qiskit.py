@@ -10,7 +10,7 @@ from itertools import product
 from qutip import qeye, sigmax, sigmay, sigmaz, tensor, ket2dm
 
 class NumExp:
-    def get_circuit(self, N, circ, circuit_gate,p_unitay=0, random_channel=None):
+    def get_circuit(self, N, circ, circuit_gate,p_unitay, random_channel=None):
         if p_unitay==0:
             factor = 1
         else:
@@ -37,6 +37,13 @@ class NumExp:
         if random_channel:
             kraus_op = Kraus(random_channel)
             circ.append(kraus_op, range(N))
+
+        # if p_unitay==0:
+        #     factor = 1
+        # else:
+        #     factor =  1+(np.random.uniform()-0.5)*p_unitay #np.random.normal(loc=(1-p_unitay), scale=0.01, size=1)[0]
+        # #print('factor:',factor)
+        # theta = factor*(np.pi/2)
 
         for n in range(N):
             gate_ro = circuit_gate[1][N-n-1]
@@ -99,7 +106,7 @@ class NumExp:
         # Noisy simulator
         sim_noise = AerSimulator(noise_model=noise_model)
         circ_tnoise = transpile(circ, sim_noise)
-        result_noise = sim_noise.run(circ_tnoise, shots=4096).result()
+        result_noise = sim_noise.run(circ_tnoise, shots=10000).result()
         return result_noise.get_counts()
 
     def get_measurement(self, N, p_reset, p_meas,p_unitay, random_channel):
@@ -119,15 +126,4 @@ class NumExp:
         
         return np.array(nois_measure)
 
-    def get_idea_chi_matrix(self, random_channel, N):
-        pauli = [qeye(2), sigmax(), sigmay(), sigmaz()]
-        Elist = [tensor(*op) for op in product(pauli, repeat=N)]
-        Elist = [E.full() for E in Elist]
-        chi_exact = np.zeros((2**(2*N), 2**(2*N)), dtype=complex)
 
-        for a in range(2**(2*N)):
-            for b in range(2**(2*N)):
-                Ea, Eb = Elist[a], Elist[b]
-                chi_exact[a, b] = np.sum([np.trace(Ea @ gate) * np.trace(Eb.conj().T @ gate.conj().T) / 2**(2*N)
-                                          for gate in random_channel])
-        return chi_exact

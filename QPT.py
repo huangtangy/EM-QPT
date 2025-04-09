@@ -20,7 +20,7 @@ from jax import numpy as jnp
 import cvxpy as cp
 
 class QPT():
-    def __init__(self, N, measure_data,random_channel=None):  # ,Amatrix,psi_in_idea,obervables
+    def __init__(self, N, measure_data,random_channel=None,notes=None):  # ,Amatrix,psi_in_idea,obervables
         """
         :param N: Number of qubits
         :param measure_data: Measurement data (outcomes)
@@ -38,17 +38,28 @@ class QPT():
         # Pauli basis and tensor products
         pauli = [qeye(2), sigmax(), sigmay(), sigmaz()]
         self.pauli_sys = [tensor(*op) for op in product(pauli, repeat=N)]
-
-        # Prepare state rotations and input states
         zero, one = basis(2, 0), basis(2, 1)
-        stat_rot = [qeye(2), qugate.rx(-np.pi / 2), qugate.ry(-np.pi / 2), qugate.ry(np.pi)]
-        
-        inputst = [ro * zero for ro in stat_rot]
-        psi_in_idea = [tensor(*psi) for psi in product(inputst, repeat=N)]
 
-        # Rotation matrices for measurement
-        rotation = [qeye(2), qugate.rx(np.pi / 2), qugate.ry(np.pi / 2)]
-        U_rotation = [tensor(*rot) for rot in product(rotation, repeat=N)]
+        #=========================================================================================================
+        # ==========#(single-qubit gate and numeric) Prepare state rotations and input states=====================
+        #=========================================================================================================
+        if notes==None:
+            stat_rot = [qeye(2), qugate.rx(-np.pi / 2), qugate.ry(-np.pi / 2), qugate.ry(np.pi)]
+            inputst = [ro * zero for ro in stat_rot]
+            psi_in_idea = [tensor(*psi) for psi in product(inputst, repeat=N)]
+            # Rotation matrices for measurement
+            rotation = [qeye(2), qugate.rx(np.pi / 2), qugate.ry(np.pi / 2)]
+            U_rotation = [tensor(*rot) for rot in product(rotation, repeat=N)]
+        else:
+        #=========================================================================================================
+        # ================ the CZ setup ==========================================================================  
+        #=========================================================================================================
+            plus, mins = (zero + one).unit(), (zero + 1j * one).unit()  # |+x> state # |-y> state Rxy(90,0);Rxy(90,90)
+            inputst = [zero, one, plus, mins]
+            psi_in_idea = [tensor(*psi) for psi in product(inputst, repeat=N)]
+            rotation = [qeye(2), qugate.ry(np.pi / 2 * (-1)), qugate.rx(np.pi / 2)]  
+            U_rotation = [tensor(*rot) for rot in product(rotation, repeat=N)]
+       
 
         # Measurement projectors
         e_sys = [tensor(*state) for state in product([basis(2, i) for i in range(2)], repeat=N)]
@@ -139,7 +150,7 @@ class QPT():
             constraints1 = [X1 >> 0, cp.trace(X1) == 1]
 
             prob1 = cp.Problem(obj1, constraints1)
-            prob1.solve(solver=cp.SCS,eps=1e-5 );  # , verbose=True max_iters=5000,
+            prob1.solve(solver=cp.SCS,eps=1e-5);  # , verbose=True max_iters=5000,
 
             rho_estimate = Qobj(X1.value, dims=self.dim)
             rho_out_list.append(rho_estimate)
