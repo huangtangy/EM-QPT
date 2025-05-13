@@ -1,4 +1,9 @@
 # Error-mitigated Quantum Process Tomography (EM-QPT)
+
+# See reference: arXiv 2505.07725
+
+Notes:
+
  The file "main.ipynb" refers the EM-QPT method based on simulation (qiskit).
 
  (1).Required packages (python) are listed in the 'requirement.txt', for running the entire code.
