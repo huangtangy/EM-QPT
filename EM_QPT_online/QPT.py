@@ -119,7 +119,20 @@ class QPT():
         chi1 = cp.reshape(X1.T, ((4 ** N) ** 2,),order='F')# default order in different version of cp, the numpy default is order='C'
 
         obj1 = cp.Minimize(cp.norm(coeff_with_spam @ chi1 - Ob, 2))
-        constraints1 = [X1 >> 0, cp.trace(X1) == 1]
+        #constraints1 = [X1 >> 0, cp.trace(X1) == 1]
+        d = rho_in_nos[0].shape[0]  
+        I_d = np.eye(d, dtype=complex)
+        
+        tp_expr = 0
+        for m in range(dim_chi):
+            for n in range(dim_chi):
+                # E[n].dag() * E[m] 
+                tp_expr += X1[m, n] * (E[n].dag() * E[m]).full()  
+        
+        constraints1 = [
+            X1 >> 0,
+            tp_expr == I_d   
+        ]
 
         prob1 = cp.Problem(obj1, constraints1)
         prob1.solve(solver=cp.SCS,eps=1e-6,warm_start= True);  # , verbose=True#cp.SCScp.OSQP#,eps=1e-10 ,eps=1e-10 ,alpha=2.0 
