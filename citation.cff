@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Huang"
+  given-names: "Tangyou"
+  orcid: "https://orcid.org/0000-0003-2824-769X"
+title: "Quantum Process Tomography with Digital Twins of Error Matrices"
+date-released: 2025-05
+url: "https://github.com/huangtangy/EM-QPT"
