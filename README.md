@@ -1,7 +1,7 @@
 # Error-mitigated Quantum Process Tomography (EM-QPT)
 
 # See reference: arXiv 2505.07725
-
+# See reference: Phys. Rev. Lett. 135, 230601 (2025)
 Notes:
 
  The file "main.ipynb" refers the EM-QPT method based on simulation (qiskit).
