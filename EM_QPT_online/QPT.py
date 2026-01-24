@@ -174,6 +174,9 @@ class QPT():
             X1_vec = cp.reshape(X1, ((2 ** N) ** 2,),order='F')  # vecterize rho
             chi_matrix = np.reshape(chi_matrix, (dim_chi ** 2,))  # the chi matrix
             #print(np.shape(observables),(len(observables), dim_chi))
+            # notes: if some bug on the reshape, try this :
+            #observables1 = np.array([ob.full() for ob in observables])
+            #obervables_vec = observables1.reshape( (len(observables), dim_chi))
             obervables_vec = np.reshape(observables, (len(observables), dim_chi))
             #print('obervables_vec',obervables_vec)
             obj1 = cp.Minimize(cp.norm(coeff_with_spam @ chi_matrix - X1_vec @ obervables_vec.T,2))  # acting the chi matrix on the idea states
