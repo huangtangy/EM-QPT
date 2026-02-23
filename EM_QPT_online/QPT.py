@@ -135,7 +135,7 @@ class QPT():
         ]
 
         prob1 = cp.Problem(obj1, constraints1)
-        prob1.solve(solver=cp.SCS,eps=1e-6,warm_start= True);  # , verbose=True#cp.SCScp.OSQP#,eps=1e-10 ,eps=1e-10 ,alpha=2.0 
+        prob1.solve(solver=cp.SCS,eps=1e-8,warm_start= True);  # , verbose=True#cp.SCScp.OSQP#,eps=1e-10 ,eps=1e-10 ,alpha=2.0 
 
         return X1.value
  
