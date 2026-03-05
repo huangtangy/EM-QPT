@@ -89,6 +89,7 @@ class QPT():
             Qobj(np.sum([K @ rho.full() @ K.conj().T for K in random_channel], axis=0), dims=self.dim)
             for rho in self.rho_in_idea
         ]
+        self.psi_in_idea = psi_in_idea
 
     def get_chi_LS_X(self,rho_in_list,proj_list):
         '''
@@ -175,9 +176,9 @@ class QPT():
             chi_matrix = np.reshape(chi_matrix, (dim_chi ** 2,))  # the chi matrix
             #print(np.shape(observables),(len(observables), dim_chi))
             # notes: if some bug on the reshape, try this :
-            #observables1 = np.array([ob.full() for ob in observables])
-            #obervables_vec = observables1.reshape( (len(observables), dim_chi))
-            obervables_vec = np.reshape(observables, (len(observables), dim_chi))
+            observables1 = np.array([ob.full() for ob in observables])
+            obervables_vec = observables1.reshape( (len(observables), dim_chi))
+            #obervables_vec = np.reshape(observables, (len(observables), dim_chi))
             #print('obervables_vec',obervables_vec)
             obj1 = cp.Minimize(cp.norm(coeff_with_spam @ chi_matrix - X1_vec @ obervables_vec.T,2))  # acting the chi matrix on the idea states
             #obj1 = cp.Minimize(cp.norm(Ob - X1_vec @ obervables_vec.T, 2)) # using thr raw measurement data instead of chi (really small difference)
@@ -242,3 +243,94 @@ class QPT():
                 proj_out_list.append(Qobj(M.conj(), dims=self.dim))
 
         return proj_out_list
+    # ---------------------- unitary learning (jax) ----------------------
+    def get_UL_GD(self, Utar=None, measure_data=None, psi_in_list=None):
+        """
+        Utar: target gate
+        measure_data: whole dataset of QPT
+        psi_in_list: revised psi (from identity QST of an identity QPT)
+        """
+        N = self.N
+        if psi_in_list is None:
+            psi_in_list = [psi.full() for psi in self.psi_in_idea]
+
+        measure_data = self.measure_data if measure_data is None else measure_data
+        observables = self.observables
+
+        def stiefel_update(params, grads, step_size):
+            U = jnp.hstack([grads, params])
+            V = jnp.hstack([params, -grads])
+            prod_term = V.T.conj() @ U
+            invterm = jnp.eye(prod_term.shape[0]) + (step_size / 2.0) * prod_term
+            A = step_size * (U @ jnp.linalg.inv(invterm))
+            B = V.T.conj() @ params
+            return params - A @ B
+
+        def L2_norm(params, measure_data_, psi_list):
+            i = 0
+            B_pred_list, B_tar_list = [], []
+
+            for psi in psi_list:
+                B_tar = jnp.array(
+                    measure_data_[i * 3 ** N : (i + 1) * 3 ** N, : 2 ** N].flatten()
+                )
+                B_tar_list.append(B_tar)
+
+                psi_pred = params @ psi
+                rho = psi_pred @ psi_pred.conj().T
+                B_pred = jnp.array([jnp.trace(rho @ obs.full()) for obs in observables])
+                B_pred_list.append(B_pred)
+
+                i += 1
+
+            B_pred_list = jnp.array(B_pred_list)
+            B_tar_list = jnp.array(B_tar_list)
+            return jnp.linalg.norm(B_pred_list - B_tar_list) / (12 ** N)
+
+        def qst_lossfun(params, measure_data_, psi_list):
+            return L2_norm(params, measure_data_, psi_list)
+
+        def get_gatefidelity(U1, U2):
+            dim = np.shape(U1)[0]
+            F_ave = (dim * (np.abs(np.trace(U1 @ U2.conj().T) ** 2) / (dim) ** 2) + 1) / (dim + 1)
+            return np.real(F_ave)
+
+        def get_opt_U(measure_data_, psi_list):
+            params = rand_unitary(2 ** N, density=0.01).full()
+            loss_hist_qst = []
+
+            lr = 0.05
+            alpha = 1.1
+            prev_loss = float("inf")
+
+            for _ in range(100):
+                grads = jax.grad(qst_lossfun)(params, measure_data_, psi_list)
+                grads = jnp.conj(grads)
+                grads = grads / jnp.linalg.norm(grads)
+
+                params = stiefel_update(params, grads, lr)
+                current_loss = qst_lossfun(params, measure_data_, psi_list)
+
+                if current_loss >= prev_loss:
+                    lr *= 0.1
+                    if lr < 1e-7:
+                        break
+                else:
+                    lr = min(alpha * lr, 0.2)
+
+                prev_loss = current_loss
+
+                if not np.isfinite(np.sum(params @ params.conj().T)):
+                    break
+                if current_loss < 1e-7:
+                    break
+
+                loss_hist_qst.append(qst_lossfun(params, measure_data_, psi_list))
+
+            return loss_hist_qst, params
+
+        losslist, U_pre = get_opt_U(measure_data, psi_in_list)
+        
+        F = get_gatefidelity(Utar, U_pre)
+
+        return U_pre, F, losslist
